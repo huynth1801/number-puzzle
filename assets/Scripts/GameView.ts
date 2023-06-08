@@ -181,6 +181,14 @@ export class GameView extends Component {
         return this.clockBtn;
     }
 
+    @property({
+        type: Button
+    })
+    private cheatBtn: Button;
+    public get CheatBtn(): Button {
+        return this.cheatBtn;
+    }
+
 
     protected onLoad(): void {
         let level = find('StoreLevel').getComponent(Store);

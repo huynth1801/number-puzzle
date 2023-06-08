@@ -1,4 +1,4 @@
-import { _decorator, Component, director, Node, find, instantiate, Vec3, UITransform, Label, Sprite, Input, input, Prefab, EventMouse, Camera, randomRange, math, Game, tween, Vec2, Color } from 'cc';
+import { _decorator, Component, director, Node, find, instantiate, Vec3, UITransform, Label, Sprite, Input, input, Prefab, EventMouse, Camera, sys, math, Game, tween, Vec2, Color } from 'cc';
 import { Store } from './Store';
 import { GameView } from './GameView';
 import { GameModel } from './GameModel';
@@ -33,11 +33,21 @@ export class GameController extends Component {
     // private countdownDuration: number = 1000; 
     private remainingTime: number = 0;
     private gameState: boolean;
-    private highScore_3: number = 0;
-    private highScore_4: number = 0;
-    private highScore_5: number = 0;
-    private highScore_6: number = 0;
-    private currentScore: number = 0;
+    private curScore_3: number = 0;
+    private maxScore_3: number = 0;
+    private localScore_3: number = 0;
+
+    private curScore_4: number = 0;
+    private maxScore_4: number = 0;
+    private localScore_4: number = 0;
+
+    private curScore_5: number = 0;
+    private maxScore_5: number = 0;
+    private localScore_5: number = 0;
+
+    private curScore_6: number = 0;
+    private maxScore_6: number = 0;
+    private localScore_6: number = 0;
 
     protected onLoad(): void {
         let store = find('StoreLevel').getComponent(Store);
@@ -46,17 +56,26 @@ export class GameController extends Component {
         let volumeValue = store.VolumeValue;
         this.gameView.muteBtn.active = volumeValue === 1;
         this.gameView.unMuteBtn.active = volumeValue !== 1;
+        this.gameView.BtnSound.volume = volumeValue;
         this.gameView.SwipeSound.volume = volumeValue;
         this.gameView.LoseSound.volume = volumeValue;
         this.gameView.WinSound.volume = volumeValue;
         if (gridSize === 3) {
-            this.saveHighScore(this.highScore_3, highScoreText);
+            if (!sys.localStorage.getItem(highScoreText)) {
+                sys.localStorage.setItem(highScoreText, this.curScore_3.toString());
+            }
         } else if (gridSize === 4) {
-            this.saveHighScore(this.highScore_4, highScoreText);
+            if (!sys.localStorage.getItem(highScoreText)) {
+                sys.localStorage.setItem(highScoreText, this.curScore_4.toString());
+            }
         } else if (gridSize === 5) {
-            this.saveHighScore(this.highScore_5, highScoreText);
+            if (!sys.localStorage.getItem(highScoreText)) {
+                sys.localStorage.setItem(highScoreText, this.curScore_5.toString());
+            }
         } else {
-            this.saveHighScore(this.highScore_6, highScoreText);
+            if (!sys.localStorage.getItem(highScoreText)) {
+                sys.localStorage.setItem(highScoreText, this.curScore_6.toString());
+            }
         }
         this.startCountdown();
     }
@@ -128,26 +147,24 @@ export class GameController extends Component {
         // console.log('end', this.cells);
 
         if (this.checkWin()) {
-            if (this.checkWin()) {
-                this.gameState = true;
-                this.cells.splice(-1);
-                let lastCell = instantiate(this.gameView.CellPrefab);
-                lastCell.getComponent(UITransform).setContentSize(gridWH, gridWH);
-                this.board.addChild(lastCell);
-                lastCell.getComponentInChildren(Label).string = (gridSize*gridSize).toString();
-                let lastCellPosX = offsetX + (gridSize-1)*gridWH;
-                let lastCellPosY = offsetY + (gridSize-1)*gridWH;
-                tween(lastCell)
-                .to(0, {position: new Vec3(lastCellPosX + gridWH*(gridSize-1), -lastCellPosY, 0.0)}, {easing: 'cubicInOut'})
-                .to(0.5, {position: new Vec3(lastCellPosX, -lastCellPosY, 0.0)}, {easing: 'cubicInOut'})
-                .start()
-                setTimeout(() => {
-                    this.gameView.WinSound.play();
-                    this.ControlGameButtons(this.gameState);
-                    this.gameView.WinBoard.active = true;
-                    this.gameView.ClockBtn.color = new Color(124,124,124,255);
-                }, 650)
-            }
+            this.gameState = true;
+            this.cells.splice(-1);
+            let lastCell = instantiate(this.gameView.CellPrefab);
+            lastCell.getComponent(UITransform).setContentSize(gridWH, gridWH);
+            this.board.addChild(lastCell);
+            lastCell.getComponentInChildren(Label).string = (gridSize*gridSize).toString();
+            let lastCellPosX = offsetX + (gridSize-1)*gridWH;
+            let lastCellPosY = offsetY + (gridSize-1)*gridWH;
+            tween(lastCell)
+            .to(0, {position: new Vec3(lastCellPosX + gridWH*(gridSize-1), -lastCellPosY, 0.0)}, {easing: 'cubicInOut'})
+            .to(0.5, {position: new Vec3(lastCellPosX, -lastCellPosY, 0.0)}, {easing: 'cubicInOut'})
+            .start()
+            setTimeout(() => {
+                this.gameView.WinSound.play();
+                this.ControlGameButtons(this.gameState);
+                this.gameView.WinBoard.active = true;
+                this.gameView.ClockBtn.color = new Color(124,124,124,255);
+            }, 650)
         }
     }
 
@@ -202,7 +219,7 @@ export class GameController extends Component {
 
 
     private showResult() {
-        this.board.off(Node.EventType.MOUSE_UP, this.onMouseUp, this);
+        this.board.off(Node.EventType.TOUCH_END, this.onMouseUp, this);
     }
 
     private onHomeBtnClick(): void {
@@ -212,7 +229,7 @@ export class GameController extends Component {
 
     private onMuteBtnClick(): void {
         this.setAudioVolume(0);
-        this.gameView.BtnSound.play();
+        // this.gameView.BtnSound.play();
         this.gameView.muteBtn.active = false;
         this.gameView.unMuteBtn.active = true;
     }
@@ -225,13 +242,12 @@ export class GameController extends Component {
     }
 
     private setAudioVolume(volume: number): void {
-        this.gameView.BtnSound.play();
+        let store = find('StoreLevel').getComponent(Store);
+        store.VolumeValue = volume;
         this.gameView.SwipeSound.volume = volume;
         this.gameView.BtnSound.volume = volume;
         this.gameView.LoseSound.volume = volume;
         this.gameView.WinSound.volume = volume;
-        let store = find('StoreLevel').getComponent(Store);
-        store.VolumeValue = volume;
     }
 
     private removeLastNodeFromContainer(container: Node): void {
@@ -265,6 +281,7 @@ export class GameController extends Component {
     }
 
     private ControlGameButtons(gameState: boolean): void {
+        this.gameView.CheatBtn.interactable = !gameState;
         this.gameView.BgBlur.active = gameState;
         this.gameView.ButtonBoard.active = gameState;
         this.gameView.RestartBtn.interactable = !gameState;
@@ -282,11 +299,11 @@ export class GameController extends Component {
     // Time countdown
     private startCountdown(): void {
         let level = find('StoreLevel').getComponent(Store);
-        let countdownDuration = level.TimeExcution;
-        this.remainingTime = countdownDuration;
+        this.remainingTime = level.TimeExcution;
         this.schedule(this.updateCountdownLabel, 1, level.TimeExcution, 0);
         this.updateCountdownLabel();
     }
+
     
     private updateCountdownLabel(): void {
         let level = find('StoreLevel').getComponent(Store);
@@ -294,7 +311,8 @@ export class GameController extends Component {
         let levelText = level.HighScore;
         let countdownDuration = level.TimeExcution;
         this.gameView.timerLabel.string = this.formatTime(this.remainingTime);
-        if (this.remainingTime <= 0) {
+        // this.remainingTime--;
+        if (this.remainingTime === 0) {
             this.unschedule(this.updateCountdownLabel);
             this.showResult();
             this.gameState = true;
@@ -309,9 +327,7 @@ export class GameController extends Component {
             let score = countdownDuration - this.remainingTime;
             this.updateScore(score, gridSize, levelText);
         }
-        else {
-            this.remainingTime--;
-        }
+        this.remainingTime--;
         // console.log(this.remainingTime);
     }
     
@@ -329,7 +345,7 @@ export class GameController extends Component {
         // Nếu đã có điểm cao nhất lưu trước đó, so sánh với điểm mới và lưu điểm cao nhất mới vào local storage
         if (previousHighScore) {
         const currentHighScore = Number(previousHighScore);
-            if (score > currentHighScore) {
+            if (score < currentHighScore) {
                 localStorage.setItem(levelText, String(score));
             }
         }
@@ -340,42 +356,51 @@ export class GameController extends Component {
     }
     
     private updateScore(score: number, level: number, levelText: string): void {
-        // Cập nhật điểm hiện tại
-        this.currentScore = score;
-        
         // Kiểm tra và cập nhật điểm cao nhất
         if (level === 3) {
-            if (this.highScore_3 === 0) {
-                this.highScore_3 = score;
-                this.saveHighScore(this.highScore_3, levelText);
-            } else if (score < this.highScore_3) {
-                this.highScore_3 = score;
-                this.saveHighScore(this.highScore_3, levelText);
+            this.curScore_3 = score;
+            this.localScore_3 = parseInt(sys.localStorage.getItem(levelText));
+            if (this.localScore_3 === 0) {
+                this.maxScore_3 = Math.max(this.localScore_3, this.curScore_3);
+                sys.localStorage.setItem(levelText, this.maxScore_3.toString());
+            }
+            else {
+                this.maxScore_3 = Math.min(this.localScore_3, this.curScore_3);
+                sys.localStorage.setItem(levelText, this.maxScore_3.toString());
             }
         }  else if (level === 4) {
-            if (this.highScore_4 === 0) {
-                this.highScore_4 = score;
-                this.saveHighScore(this.highScore_4, levelText);
-            } else if (score < this.highScore_4) {
-                this.highScore_4 = score;
-                this.saveHighScore(this.highScore_4, levelText);
-            } 
+            this.curScore_4 = score;
+            this.localScore_4 = parseInt(sys.localStorage.getItem(levelText));
+            if (this.localScore_4 === 0) {
+                this.maxScore_4 = Math.max(this.localScore_4, this.curScore_4);
+                sys.localStorage.setItem(levelText, this.maxScore_4.toString());
+            }
+            else {
+                this.maxScore_4 = Math.min(this.localScore_4, this.curScore_4);
+                sys.localStorage.setItem(levelText, this.maxScore_4.toString());
+            }
         } else if (level === 5) {
-            if (this.highScore_5 === 0) {
-                this.highScore_5 = score;
-                this.saveHighScore(this.highScore_5, levelText);
-            } else if (score < this.highScore_5) {
-                this.highScore_5 = score;
-                this.saveHighScore(this.highScore_5, levelText);
-            } 
+            this.curScore_5 = score;
+            this.localScore_5 = parseInt(sys.localStorage.getItem(levelText));
+            if (this.localScore_5 === 0) {
+                this.maxScore_5 = Math.max(this.localScore_5, this.curScore_5);
+                sys.localStorage.setItem(levelText, this.maxScore_5.toString());
+            }
+            else {
+                this.maxScore_5 = Math.min(this.localScore_5, this.curScore_5);
+                sys.localStorage.setItem(levelText, this.maxScore_5.toString());
+            }
         } else {
-            if (this.highScore_6 === 0) {
-                this.highScore_6 = score;
-                this.saveHighScore(this.highScore_6, levelText);
-            } else if (score < this.highScore_6) {
-                this.highScore_6 = score;
-                this.saveHighScore(this.highScore_6, levelText);
-            } 
+            this.curScore_6 = score;
+            this.localScore_6 = parseInt(sys.localStorage.getItem(levelText));
+            if (this.localScore_6 === 0) {
+                this.maxScore_6 = Math.max(this.localScore_6, this.curScore_6);
+                sys.localStorage.setItem(levelText, this.maxScore_6.toString());
+            }
+            else {
+                this.maxScore_6 = Math.min(this.localScore_6, this.curScore_6);
+                sys.localStorage.setItem(levelText, this.maxScore_6.toString());
+            }
         }
     }
     
@@ -384,5 +409,108 @@ export class GameController extends Component {
         const totalSeconds = minutes * 60 + seconds;
         return totalSeconds;
     }
+
+    private onCheatBtnClick(): void {
+        this.gameView.BtnSound.play();
+        function sortArrayWithZeroAtEnd(arr) {
+            arr.sort((a, b) => {
+              if (a === 0) return 1; // Đẩy số 0 xuống cuối mảng
+              if (b === 0) return -1; // Đẩy số 0 xuống cuối mảng
+              return a - b; // Sắp xếp các số khác nhau theo thứ tự tăng dần
+            });
+        }
+        let arr = this.cells;
+        sortArrayWithZeroAtEnd(arr);
+        this.gameView.Show(arr);
+        let store = find('StoreLevel').getComponent(Store);
+        let level = store.storeMatrix;
+        let levelText = store.HighScore;
+        let countdownDuration = store.TimeExcution;
+        let gridWH = store.storeWH;
+        if (level === 3) {
+            this.cells.splice(-1);
+            let lastCell = instantiate(this.gameView.CellPrefab);
+            lastCell.getComponent(UITransform).setContentSize(gridWH, gridWH);
+            this.board.addChild(lastCell);
+            lastCell.getComponentInChildren(Label).string = (level*level).toString();
+            tween(lastCell)
+            .to(0, {position: new Vec3(300, -100, 0.0)}, {easing: 'cubicInOut'})
+            .to(0.5, {position: new Vec3(100, -100, 0.0)}, {easing: 'cubicInOut'})
+            .start()
+            let score = countdownDuration - this.remainingTime;
+            // this.unschedule(this.updateCountdownLabel);
+            // this.gameView.CheatBtn.interactable = false;
+            this.updateScore(score, level, levelText);
+            setTimeout(() => {
+                this.gameView.WinSound.play();
+                this.gameState = true;
+                this.ControlGameButtons(this.gameState);
+                this.gameView.WinBoard.active = true;
+                this.gameView.ClockBtn.color = new Color(124,124,124,255);
+            }, 650)
+        } else if (level === 4) {
+            this.cells.splice(-1);
+            let lastCell = instantiate(this.gameView.CellPrefab);
+            lastCell.getComponent(UITransform).setContentSize(gridWH, gridWH);
+            this.board.addChild(lastCell);
+            lastCell.getComponentInChildren(Label).string = (level*level).toString();
+            tween(lastCell)
+            .to(0, {position: new Vec3(300, -135, 0.0)}, {easing: 'cubicInOut'})
+            .to(0.5, {position: new Vec3(135, -135, 0.0)}, {easing: 'cubicInOut'})
+            .start()
+            let score = countdownDuration - this.remainingTime;
+            // this.unschedule(this.updateCountdownLabel);
+            this.updateScore(score, level, levelText);
+            setTimeout(() => {
+                this.gameView.WinSound.play();
+                this.gameState = true;
+                this.ControlGameButtons(this.gameState);
+                this.gameView.WinBoard.active = true;
+                this.gameView.ClockBtn.color = new Color(124,124,124,255);
+            }, 650)
+        } else if (level === 5) {
+            this.cells.splice(-1);
+            let lastCell = instantiate(this.gameView.CellPrefab);
+            lastCell.getComponent(UITransform).setContentSize(gridWH, gridWH);
+            this.board.addChild(lastCell);
+            lastCell.getComponentInChildren(Label).string = (level*level).toString();
+            tween(lastCell)
+            .to(0, {position: new Vec3(300, -160, 0.0)}, {easing: 'cubicInOut'})
+            .to(0.5, {position: new Vec3(-160, -160, 0.0)}, {easing: 'cubicInOut'})
+            .start()
+            let score = countdownDuration - this.remainingTime;
+            // this.unschedule(this.updateCountdownLabel);
+            this.updateScore(score, level, levelText);
+            setTimeout(() => {
+                this.gameView.WinSound.play();
+                this.gameState = true;
+                this.ControlGameButtons(this.gameState);
+                this.gameView.WinBoard.active = true;
+                this.gameView.ClockBtn.color = new Color(124,124,124,255);
+            }, 650)
+        } else {
+            this.cells.splice(-1);
+            let lastCell = instantiate(this.gameView.CellPrefab);
+            lastCell.getComponent(UITransform).setContentSize(gridWH, gridWH);
+            this.board.addChild(lastCell);
+            lastCell.getComponentInChildren(Label).string = (level*level).toString();
+            tween(lastCell)
+            .to(0, {position: new Vec3(300, -187.5, 0.0)}, {easing: 'cubicInOut'})
+            .to(0.5, {position: new Vec3(187.5, -187.5, 0.0)}, {easing: 'cubicInOut'})
+            .start()
+            let score = countdownDuration - this.remainingTime;
+            // this.unschedule(this.updateCountdownLabel);
+            this.updateScore(score, level, levelText);
+            setTimeout(() => {
+                this.gameView.WinSound.play();
+                this.gameState = true;
+                this.ControlGameButtons(this.gameState);
+                this.gameView.WinBoard.active = true;
+                this.gameView.ClockBtn.color = new Color(124,124,124,255);
+            }, 650)
+        } 
+    }
+
+    
 }
 
